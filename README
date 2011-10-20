@@ -1,0 +1,5 @@
+Ashwin Siripurapu
+
+Usage:
+compile by running "ghc --make hilbert"
+run with "./hilbert rects.txt", where "rects.txt" is the filename
