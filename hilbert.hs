@@ -11,8 +11,8 @@ type Point a = (a, a)
 data Rect = Rect [Point Int] | Degenerate
 
 data HilbertRTree = Empty
-                    | Leaf { mbr :: Rect, dataRects :: [Rect] }
-                    | InteriorNode { mbr :: Rect, lhv :: Int, children :: [HilbertRTree] }
+                    | Leaf { mbr :: Rect, lhv :: Int, dataRects :: [Rect], parent :: HilbertRTree }
+                    | InteriorNode { mbr :: Rect, children :: [HilbertRTree] }
 
 leafCapacity :: Int
 leafCapacity = 4
@@ -60,13 +60,17 @@ search (InteriorNode {mbr=mbr, children=children}) r = if not $ intersect mbr r 
 
 insert :: Rect -> HilbertRTree -> HilbertRTree
 insert Degenerate tree = tree
-insert r@(Rect list) Empty = Leaf {mbr = r, dataRects = [r]}
-insert r@(Rect list) (Leaf {mbr = mbr, dataRects = rects})
-    | length rects < leafCapacity = Leaf {mbr = minimumBoundingRectangle(r:rects), dataRects = r:rects}
-    | otherwise                   = Empty
+insert r@(Rect list) Empty = Leaf {mbr = r, lhv = computeLHV [r], dataRects = [r], parent = Empty}
+    where computeLHV = maximum . map (hilbertValue . midpoint)
+insert r@(Rect list) l@(Leaf {mbr = mbr, dataRects = rects, parent = p})
+    | length rects < leafCapacity = l {mbr = minimumBoundingRectangle allRects, lhv = computeLHV allRects, dataRects = allRects}
+    | otherwise                   = handleOverflow p r
+    where allRects = r:rects
+          computeLHV = maximum . map (hilbertValue . midpoint)
+          handleOverflow _ _ = Empty
 
 printTree :: HilbertRTree -> IO ()
-printTree (Leaf mbr rects) = printRects rects
+printTree (Leaf {mbr = mbr, dataRects = rects, lhv = val, parent = p}) = printRects rects
     where printRects [] = return ()
           printRects ((Rect list):rs) = do print list
                                            printRects rs
