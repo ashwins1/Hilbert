@@ -1,3 +1,6 @@
+/* The following functions used to generate the Hilbert values of points in N^2 were
+   shamelessly lifted from Wikipedia. Props to whomever thought these up in the first place. */
+
 int xy2d (int n, int x, int y) {
     int rx, ry, s, d=0;
     for (s=n/2; s>0; s/=2) {

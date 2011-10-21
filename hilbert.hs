@@ -12,7 +12,7 @@ data Rect = Rect [Point Int] | Degenerate
 
 data HilbertRTree = Empty
                     | Leaf { mbr :: Rect, lhv :: Int, dataRects :: [Rect], parent :: HilbertRTree }
-                    | InteriorNode { mbr :: Rect, children :: [HilbertRTree] }
+                    | InteriorNode { mbr :: Rect, lhv :: Int, children :: [HilbertRTree] }
 
 leafCapacity :: Int
 leafCapacity = 4
@@ -20,8 +20,9 @@ leafCapacity = 4
 interiorCapacity :: Int
 interiorCapacity = 5
 
+-- this "Hilbert value" function is really just the Cantor pairing function...I couldn't get the real Hilbert function working :(
 hilbertValue :: Point Int -> Int
-hilbertValue (x, y) = x + y
+hilbertValue (x, y) = y + (((x + y) * (x + y + 1)) `div` 2)
 
 rectToList :: Rect -> [Point Int]
 rectToList (Rect list) = list
@@ -43,15 +44,19 @@ midpoint (Rect list) = (average $ map fst list, average $ map snd list)
     where average nums = sum nums `div` length nums
 
 minimumBoundingRectangle :: [Rect] -> Rect
-minimumBoundingRectangle rs = Rect( [(mn xlist, mn ylist), (mn xlist, mx ylist), (mx xlist, mn ylist), (mx xlist, mx ylist)] )
+minimumBoundingRectangle rs = Rect( [(x,y) | x <- [mn xlist, mx xlist], y <- [mn ylist, mx ylist]] )
     where xlist = map fst $ concat $ map rectToList rs
           ylist = map snd $ concat $ map rectToList rs
           mn = minimum
           mx = maximum
 
+computeLHV :: [Rect] -> Int
+computeLHV = maximum . map (hilbertValue . midpoint)
+
 intersect :: Rect -> Rect -> Bool
-intersect r1 r2 = not (noOverlap r1 r2 fst && noOverlap r2 r1 fst && noOverlap r1 r2 snd && noOverlap r2 r1 snd)
-    where noOverlap a b relation = (head $ L.sort $ map relation (rectToList a)) > (last $ L.sort $ map relation (rectToList b))
+intersect (Rect r1) (Rect r2) = (overlap fst) && (overlap snd)
+    where overlap fn = ((head $ L.sortBy (compare `on` fn) r1) > (last $ L.sortBy (compare `on` fn) r2)) || ((head $ L.sortBy (compare `on` fn) r2) > (last $ L.sortBy (compare `on` fn) r1))
+intersect _ _ = False
 
 search :: HilbertRTree -> Rect -> [Rect]
 search _ Degenerate = []
@@ -60,17 +65,22 @@ search (InteriorNode {mbr=mbr, children=children}) r = if not $ intersect mbr r 
 
 insert :: Rect -> HilbertRTree -> HilbertRTree
 insert Degenerate tree = tree
-insert r@(Rect list) Empty = Leaf {mbr = r, lhv = computeLHV [r], dataRects = [r], parent = Empty}
-    where computeLHV = maximum . map (hilbertValue . midpoint)
-insert r@(Rect list) l@(Leaf {mbr = mbr, dataRects = rects, parent = p})
-    | length rects < leafCapacity = l {mbr = minimumBoundingRectangle allRects, lhv = computeLHV allRects, dataRects = allRects}
-    | otherwise                   = handleOverflow p r
-    where allRects = r:rects
-          computeLHV = maximum . map (hilbertValue . midpoint)
-          handleOverflow _ _ = Empty
+insert r Empty = Leaf {mbr = r, lhv = computeLHV [r], dataRects = [r], parent = Empty} 
+insert r l@(Leaf {mbr = mbr, dataRects = rects, parent = p}) = l {dataRects = (r:rects)}
+    -- | length rects < leafCapacity = createLeaf p (r:rects)
+    -- | otherwise                   = handleOverflow l r
+    -- where createLeaf p rs = Leaf {mbr = minimumBoundingRectangle rs, lhv = computeLHV rs, dataRects = rs, parent = p}
+insert r interior = interior {children = (tail ch) ++ [insert r (head ch)]}
+    where ch = children interior
+    -- | L.any (\child -> lhv child > hilbertValue r) (children i) = i {children = [child | child <- children i, child /=  
+    -- | otherwise = i {children = (children i) ++ 
 
 printTree :: HilbertRTree -> IO ()
-printTree (Leaf {mbr = mbr, dataRects = rects, lhv = val, parent = p}) = printRects rects
+printTree i@(InteriorNode {children = ch}) = printChildren ch
+    where printChildren (c:cs) = do printTree c
+                                    printChildren cs
+          printChildren [] = return ()
+printTree l@(Leaf {dataRects = rects}) = printRects rects
     where printRects [] = return ()
           printRects ((Rect list):rs) = do print list
                                            printRects rs
@@ -83,6 +93,7 @@ getInput filename = do handle <- openFile filename ReadMode
 
 queryLoop :: HilbertRTree -> IO ()
 queryLoop tree = do putStr ">>> "
+                    hFlush stdout
                     input <- getLine
                     putStr "Found "
                     print $ length $ search tree (readRect input)
@@ -96,4 +107,5 @@ queryLoop tree = do putStr ">>> "
 main = do args <- getArgs
           tree <- getInput $ head args
           printTree tree
+          putStrLn "Done reading tree. Please enter queries now..."
           queryLoop tree
