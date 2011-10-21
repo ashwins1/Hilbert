@@ -1,6 +1,7 @@
 import Data.Function
 import qualified Data.List as L
 import qualified Data.Set as S
+import Data.Time.Clock
 import Foreign.C
 import Foreign.C.Types
 import System
@@ -66,10 +67,10 @@ search (InteriorNode {mbr=mbr, children=children}) r = if not $ intersect mbr r 
 insert :: Rect -> HilbertRTree -> HilbertRTree
 insert Degenerate tree = tree
 insert r Empty = Leaf {mbr = r, lhv = computeLHV [r], dataRects = [r], parent = Empty} 
-insert r l@(Leaf {mbr = mbr, dataRects = rects, parent = p}) = l {dataRects = (r:rects)}
+insert r l@(Leaf {mbr = mbr, dataRects = rects, parent = p}) = createLeaf p (r:rects)
     -- | length rects < leafCapacity = createLeaf p (r:rects)
     -- | otherwise                   = handleOverflow l r
-    -- where createLeaf p rs = Leaf {mbr = minimumBoundingRectangle rs, lhv = computeLHV rs, dataRects = rs, parent = p}
+    where createLeaf p rs = Leaf {mbr = minimumBoundingRectangle rs, lhv = computeLHV rs, dataRects = rs, parent = p}
 insert r interior = interior {children = (tail ch) ++ [insert r (head ch)]}
     where ch = children interior
     -- | L.any (\child -> lhv child > hilbertValue r) (children i) = i {children = [child | child <- children i, child /=  
@@ -94,10 +95,9 @@ getInput filename = do handle <- openFile filename ReadMode
 queryLoop :: HilbertRTree -> IO ()
 queryLoop tree = do putStr ">>> "
                     hFlush stdout
-                    input <- getLine
-                    putStr "Found "
-                    print $ length $ search tree (readRect input)
-                    putStr " rectangles intersecting your given rectangle."
+                    input <- getLine 
+                    putStrLn ""
+                    putStrLn $ "Found " ++ (show $ length $ search tree (readRect input)) ++ " rectangles intersecting your given rectangle."
                     printList $ map (show . rectToList) $ take 4 $ search tree (readRect input)
                     queryLoop tree
                       where printList [] = putStrLn ""
@@ -105,7 +105,10 @@ queryLoop tree = do putStr ">>> "
                                                   printList xs
 
 main = do args <- getArgs
+          startTime <- getCurrentTime
           tree <- getInput $ head args
+          endTime <- getCurrentTime
           printTree tree
+          putStrLn ("Read data from " ++ (head args) ++ " in " ++ (show $ diffUTCTime endTime startTime))
           putStrLn "Done reading tree. Please enter queries now..."
           queryLoop tree
