@@ -1,3 +1,4 @@
+{-# LANGUAGE ForeignFunctionInterface #-}
 import Data.Function
 import qualified Data.List as L
 import qualified Data.Set as S
@@ -21,9 +22,10 @@ leafCapacity = 4
 interiorCapacity :: Int
 interiorCapacity = 5
 
--- this "Hilbert value" function is really just the Cantor pairing function...I couldn't get the real Hilbert function working :(
+-- the Hilbert value function is called from "hilbert_aux.c"; the code for the function was taken from the Wikipedia article on Hilbert curves
+foreign import ccall "hilbert_aux.c xy2d" c_xy2d :: CInt -> CInt -> CInt -> CInt
 hilbertValue :: Point Int -> Int
-hilbertValue (x, y) = y + (((x + y) * (x + y + 1)) `div` 2)
+hilbertValue (x, y) = fromIntegral $ c_xy2d 65536 (fromIntegral x) (fromIntegral y)
 
 rectToList :: Rect -> [Point Int]
 rectToList (Rect list) = list

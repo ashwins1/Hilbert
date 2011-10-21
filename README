@@ -1,5 +1,5 @@
 Ashwin Siripurapu
 
 Usage:
-compile by running "ghc --make hilbert"
+compile by running "ghc --make hilbert.hs hilbert_aux.c"
 run with "./hilbert rects.txt", where "rects.txt" is the filename
